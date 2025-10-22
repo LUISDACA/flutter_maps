@@ -1,0 +1,13 @@
+# Flutter
+.dart_tool/
+.buildlog/
+.packages
+.pub-cache/
+.pub/
+android/.gradle
+android/app/key.properties
+
+# Env
+.env
+.env.*
+!.env.example
