@@ -40,4 +40,9 @@ class DangerZoneRepository {
   Future<void> create(DangerZone zone) async {
     await _client.from('danger_zones').insert(zone.toInsertMap());
   }
+
+  Future<void> deleteById(int id) async {
+    // RLS solo permitirá borrar si auth.uid() == user_id
+    await _client.from('danger_zones').delete().eq('id', id);
+  }
 }

@@ -1,4 +1,3 @@
-// lib/features/map/map_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
@@ -10,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../data/models/danger_zone.dart';
 import '../../data/repositories/danger_zone_repository.dart';
 import '../../services/location_service.dart';
+import '../../services/storage_service.dart';
 import '../auth/login_page.dart';
 import 'new_report_sheet.dart';
 
@@ -89,7 +89,7 @@ class _MapPageState extends State<MapPage> {
         width: 44,
         height: 44,
         child: GestureDetector(
-          onTap: () => _showReportDetail(z),
+          onTap: () => _showReportDetail(z), // abre detalle
           child: Tooltip(
             message:
                 '${z.dangerType.toUpperCase()} • Sev ${z.severity}\n${z.description ?? ''}',
@@ -104,10 +104,13 @@ class _MapPageState extends State<MapPage> {
     final f = DateFormat('yyyy-MM-dd HH:mm');
     final created =
         z.createdAt != null ? f.format(z.createdAt!.toLocal()) : '-';
+    final myId = _client.auth.currentUser?.id;
+    final canDelete = z.id != null && z.userId == myId;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) {
+      builder: (sheetCtx) {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -177,6 +180,72 @@ class _MapPageState extends State<MapPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
+                if (canDelete)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                      ),
+                      icon: const Icon(Icons.delete_forever),
+                      label: const Text('Eliminar reporte'),
+                      onPressed: () async {
+                        final ok = await showDialog<bool>(
+                          context: sheetCtx,
+                          builder: (dCtx) => AlertDialog(
+                            title: const Text('Eliminar reporte'),
+                            content: const Text(
+                                'Esta acción no se puede deshacer. ¿Deseas continuar?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(dCtx, false),
+                                child: const Text('Cancelar'),
+                              ),
+                              FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                ),
+                                onPressed: () => Navigator.pop(dCtx, true),
+                                child: const Text('Eliminar'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (ok != true) return;
+
+                        try {
+                          // 1) borrar imagen (si hay)
+                          if (z.photoUrl != null && z.photoUrl!.isNotEmpty) {
+                            await StorageService(_client)
+                                .deleteByPublicUrl(z.photoUrl!);
+                          }
+                          // 2) borrar fila (RLS solo permite si es dueño)
+                          await _repo.deleteById(z.id!);
+
+                          if (!mounted) return;
+                          Navigator.pop(sheetCtx); // cerrar bottom sheet
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Reporte eliminado')),
+                          );
+                          await _reloadZones();
+                        } on PostgrestException catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content:
+                                    Text('Error al eliminar: ${e.message}')),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error al eliminar: $e')),
+                          );
+                        }
+                      },
+                    ),
+                  ),
               ],
             ),
           ),
