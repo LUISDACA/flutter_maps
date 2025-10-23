@@ -29,7 +29,7 @@ class _NewReportSheetState extends State<NewReportSheet> {
     final src = await showModalBottomSheet<ImageSource>(
       context: context,
       builder: (_) => SafeArea(
-        child: Wrap(children: [
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(
             leading: const Icon(Icons.camera_alt),
             title: const Text('Cámara'),
@@ -40,6 +40,7 @@ class _NewReportSheetState extends State<NewReportSheet> {
             title: const Text('Galería'),
             onTap: () => Navigator.pop(context, ImageSource.gallery),
           ),
+          const SizedBox(height: 8),
         ]),
       ),
     );
@@ -81,11 +82,8 @@ class _NewReportSheetState extends State<NewReportSheet> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(
-                  'No se pudo subir la foto (${e.statusCode}: ${e.message}). '
-                  'Se creará el reporte sin imagen.',
-                ),
-              ),
+                  content: Text(
+                      'No se pudo subir la foto (${e.statusCode}): ${e.message}')),
             );
           }
           photoUrl = null;
@@ -101,7 +99,7 @@ class _NewReportSheetState extends State<NewReportSheet> {
         dangerType: _dangerType,
         severity: _severity,
         photoUrl: photoUrl,
-        reporterEmail: user.email, // 👈 guardamos el email del reportante
+        reporterEmail: user.email,
       );
 
       Navigator.pop(context, dz);
@@ -118,59 +116,103 @@ class _NewReportSheetState extends State<NewReportSheet> {
   @override
   Widget build(BuildContext context) {
     final point = widget.initialPoint;
+    final cs = Theme.of(context).colorScheme;
+
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.7,
-      minChildSize: 0.5,
+      initialChildSize: 0.78,
+      minChildSize: 0.55,
       maxChildSize: 0.95,
       builder: (_, controller) {
         return Material(
           color: Theme.of(context).colorScheme.surface,
           elevation: 12,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
               child: Form(
                 key: _formKey,
                 child: ListView(
                   controller: controller,
                   children: [
-                    Center(
-                      child: Container(
-                        width: 44,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: Colors.black26,
-                          borderRadius: BorderRadius.circular(8),
+                    Row(
+                      children: [
+                        Icon(Icons.add_location_alt, color: cs.primary),
+                        const SizedBox(width: 8),
+                        Text('Nuevo reporte',
+                            style: Theme.of(context).textTheme.titleLarge),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: cs.primaryContainer,
+                            borderRadius: BorderRadius.circular(50),
+                          ),
+                          child: Text(
+                            'Lat ${point.latitude.toStringAsFixed(5)}, Lng ${point.longitude.toStringAsFixed(5)}',
+                            style: TextStyle(
+                                color: cs.onPrimaryContainer, fontSize: 12),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                     const SizedBox(height: 12),
-                    Text('Nuevo reporte',
-                        style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 8),
-                    Text('Lat: ${point.latitude.toStringAsFixed(6)}  '
-                        'Lng: ${point.longitude.toStringAsFixed(6)}'),
+                    if (_imageBytes != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: Image.memory(_imageBytes!, fit: BoxFit.cover),
+                        ),
+                      )
+                    else
+                      Container(
+                        height: 160,
+                        decoration: BoxDecoration(
+                          color: cs.surfaceVariant.withOpacity(.4),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: cs.outlineVariant),
+                        ),
+                        child: Center(
+                          child: Text('Sin imagen',
+                              style: TextStyle(color: cs.outline)),
+                        ),
+                      ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _dangerType,
-                      items: const [
-                        DropdownMenuItem(
-                            value: 'asalto', child: Text('Asalto / robo')),
-                        DropdownMenuItem(
-                            value: 'calle_sin_luz',
-                            child: Text('Calle sin iluminación')),
-                        DropdownMenuItem(
-                            value: 'accidente_vial',
-                            child: Text('Accidente vial')),
-                        DropdownMenuItem(value: 'otro', child: Text('Otro')),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _pickImage,
+                          icon: const Icon(Icons.attach_file),
+                          label: const Text('Adjuntar foto'),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: _dangerType,
+                            items: const [
+                              DropdownMenuItem(
+                                  value: 'asalto',
+                                  child: Text('Asalto / robo')),
+                              DropdownMenuItem(
+                                  value: 'calle_sin_luz',
+                                  child: Text('Calle sin iluminación')),
+                              DropdownMenuItem(
+                                  value: 'accidente_vial',
+                                  child: Text('Accidente vial')),
+                              DropdownMenuItem(
+                                  value: 'otro', child: Text('Otro')),
+                            ],
+                            onChanged: (v) =>
+                                setState(() => _dangerType = v ?? 'asalto'),
+                            decoration:
+                                const InputDecoration(labelText: 'Tipo'),
+                          ),
+                        ),
                       ],
-                      onChanged: (v) =>
-                          setState(() => _dangerType = v ?? 'asalto'),
-                      decoration:
-                          const InputDecoration(labelText: 'Tipo de peligro'),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -199,23 +241,10 @@ class _NewReportSheetState extends State<NewReportSheet> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: _pickImage,
-                          icon: const Icon(Icons.attach_file),
-                          label: const Text('Adjuntar foto'),
-                        ),
-                        const SizedBox(width: 12),
-                        if (_imageBytes != null)
-                          const Icon(Icons.check_circle, color: Colors.green),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
                     FilledButton.icon(
                       onPressed: _saving ? null : _submit,
-                      icon: const Icon(Icons.send),
+                      icon: const Icon(Icons.send_rounded),
                       label: Text(_saving ? 'Enviando...' : 'Enviar reporte'),
                     ),
                   ],
